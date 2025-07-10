@@ -266,6 +266,7 @@ body {
     border-radius: 20px;
     border: 1px solid rgba(255, 255, 255, 0.2);
     text-align: center;
+    position: relative;
 }
 
 .summary-title {
@@ -282,6 +283,24 @@ body {
 
 .summary-amount.spent {
     color: #ff6b6b;
+}
+
+.edit-btn {
+    position: absolute;
+    top: 1rem;
+    right: 1rem;
+    background: rgba(255, 255, 255, 0.2);
+    color: white;
+    border: none;
+    padding: 0.3rem 0.8rem;
+    border-radius: 15px;
+    cursor: pointer;
+    font-size: 0.8rem;
+    transition: all 0.3s ease;
+}
+
+.edit-btn:hover {
+    background: rgba(255, 255, 255, 0.3);
 }
 
 .expense-form {
@@ -342,6 +361,16 @@ body {
     box-shadow: 0 8px 20px rgba(255, 107, 107, 0.3);
 }
 
+.cancel-btn {
+    background: #95a5a6;
+    margin-top: 1rem;
+}
+
+.cancel-btn:hover {
+    background: #7f8c8d;
+    box-shadow: 0 8px 20px rgba(149, 165, 166, 0.3);
+}
+
 .expense-list {
     background: rgba(255, 255, 255, 0.1);
     backdrop-filter: blur(10px);
@@ -400,6 +429,26 @@ body {
     margin-right: 1rem;
 }
 
+.expense-actions {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.edit-expense-btn {
+    background: #3498db;
+    color: white;
+    border: none;
+    padding: 0.3rem 0.8rem;
+    border-radius: 15px;
+    cursor: pointer;
+    font-size: 0.8rem;
+    transition: all 0.3s ease;
+}
+
+.edit-expense-btn:hover {
+    background: #2980b9;
+}
+
 .delete-btn {
     background: #f44336;
     color: white;
@@ -413,6 +462,57 @@ body {
 
 .delete-btn:hover {
     background: #d32f2f;
+}
+
+/* Modal Styles */
+.modal {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.5);
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+}
+
+.modal-content {
+    background: rgba(255, 255, 255, 0.1);
+    backdrop-filter: blur(10px);
+    padding: 3rem;
+    border-radius: 20px;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    width: 100%;
+    max-width: 400px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+}
+
+.modal h3 {
+    font-size: 2rem;
+    color: white;
+    margin-bottom: 2rem;
+    text-align: center;
+}
+
+.modal-buttons {
+    display: flex;
+    gap: 1rem;
+    margin-top: 1.5rem;
+}
+
+.modal-buttons .form-button {
+    flex: 1;
+}
+
+.update-btn {
+    background: linear-gradient(45deg, #4caf50, #8bc34a);
+}
+
+.update-btn:hover {
+    background: linear-gradient(45deg, #3d8b40, #7cb342);
+    box-shadow: 0 8px 20px rgba(76, 175, 80, 0.3);
 }
 
 /* Auth Pages Styles */
@@ -510,7 +610,7 @@ body {
     text-align: center;
 }
 
-/* ✅ RESPONSIVE FIXES FOR MOBILE */
+/* Responsive Fixes */
 @media (max-width: 768px) {
     .hero-title {
         font-size: 2rem;
@@ -563,18 +663,17 @@ body {
         margin-right: 0;
     }
 
+    .expense-actions {
+        width: 100%;
+        justify-content: flex-end;
+    }
+
+    .edit-expense-btn,
     .delete-btn {
         width: 100%;
         text-align: center;
         padding: 0.6rem 1rem;
         border-radius: 12px;
-    }
-
-    .expense-actions {
-        display: flex;
-        flex-direction: column;
-        width: 100%;
-        gap: 0.5rem;
     }
 
     .expense-filters {
@@ -584,5 +683,132 @@ body {
 
     .expense-filters .form-select {
         width: 100%;
+    }
+
+    .modal-content {
+        padding: 2rem;
+        margin: 1rem;
+    }
+}
+
+/* [Previous CSS remains the same until .app-content] */
+
+/* Analytics View Styles */
+.analytics-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 2rem;
+}
+
+.analytics-header h2 {
+    font-size: 1.8rem;
+    color: white;
+}
+
+.time-period-selector select {
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    color: white;
+    padding: 0.5rem 1rem;
+    border-radius: 20px;
+    font-size: 0.9rem;
+}
+
+.analytics-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+    gap: 2rem;
+    margin-bottom: 2rem;
+}
+
+.analytics-card {
+    background: rgba(255, 255, 255, 0.1);
+    backdrop-filter: blur(10px);
+    padding: 1.5rem;
+    border-radius: 20px;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.analytics-card h3 {
+    color: white;
+    margin-bottom: 1.5rem;
+    font-size: 1.2rem;
+}
+
+.analytics-card.full-width {
+    grid-column: 1 / -1;
+}
+
+.chart-container {
+    position: relative;
+    height: 300px;
+    width: 100%;
+}
+
+#topExpensesList {
+    max-height: 300px;
+    overflow-y: auto;
+}
+
+.top-expense-item {
+    display: flex;
+    justify-content: space-between;
+    padding: 0.8rem 0;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    color: white;
+}
+
+.top-expense-item:last-child {
+    border-bottom: none;
+}
+
+.category-dist-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.8rem;
+}
+
+.category-dist-name {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.category-dist-bar {
+    flex: 1;
+    height: 10px;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 5px;
+    margin: 0 1rem;
+    overflow: hidden;
+}
+
+.category-dist-progress {
+    height: 100%;
+    background: linear-gradient(90deg, #667eea, #764ba2);
+    border-radius: 5px;
+}
+
+.category-dist-amount {
+    font-weight: bold;
+    color: #ffeb3b;
+}
+
+/* Responsive fixes for analytics */
+@media (max-width: 768px) {
+    .analytics-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .analytics-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 1rem;
+    }
+
+    .chart-container {
+        height: 250px;
     }
 }
