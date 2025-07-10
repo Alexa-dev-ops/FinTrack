@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Student Expense Tracker</title>
+  <link rel="stylesheet" href="style.css">
+  <!-- Firebase SDK -->
+  <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-auth.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-firestore.js"></script>
+</head>
+
+<body>
+  <!-- Landing Page -->
+  <div id="landingPage" class="landing-page">
+    <nav class="landing-nav">
+      <div class="logo">💰 FinTrack</div>
+      <div class="nav-links">
+        <a href="#features">Features</a>
+        <a href="#about">About</a>
+        <a href="#contact">Contact</a>
+      </div>
+    </nav>
+
+    <div class="hero">
+      <div class="hero-content">
+        <h1 class="hero-title">Track Your Student Expenses Like a Pro</h1>
+        <p class="hero-subtitle">Manage your school budget with ease. Track textbooks, meals, entertainment, and more
+          with our student-focused expense tracker.</p>
+        <button class="hero-button" onclick="showLogin()">Get Started</button>
+      </div>
+    </div>
+
+    <div class="features">
+      <div class="feature-card">
+        <div class="feature-icon">📚</div>
+        <h3 class="feature-title">Academic Expenses</h3>
+        <p class="feature-description">Track textbooks, supplies, and academic-related expenses easily.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">🍕</div>
+        <h3 class="feature-title">Food & Dining</h3>
+        <p class="feature-description">Monitor your food expenses from dining halls to late-night snacks.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">🎮</div>
+        <div class="feature-title">Entertainment</div>
+        <p class="feature-description">Keep track of your entertainment spending and stay within budget.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">📊</div>
+        <div class="feature-title">Smart Analytics</div>
+        <p class="feature-description">Get insights into your spending patterns and save money.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Login Page -->
+  <div id="loginPage" class="login-container">
+    <div class="login-form">
+      <h2 class="login-title">Welcome Back!</h2>
+      <form id="loginForm">
+        <div class="form-group">
+          <label class="form-label">Email</label>
+          <input type="email" class="form-input" id="loginEmail" placeholder="Enter your email" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Password</label>
+          <input type="password" class="form-input" id="loginPassword" placeholder="Enter your password" required>
+        </div>
+        <button type="submit" class="form-button">Login</button>
+      </form>
+      <p class="auth-switch">
+        Don't have an account?
+        <button class="auth-link" onclick="showSignup()">Sign Up</button>
+      </p>
+      <button class="back-to-landing" onclick="showLanding()">Back to Landing</button>
+    </div>
+  </div>
+
+  <!-- Signup Page -->
+  <div id="signupPage" class="login-container">
+    <div class="login-form">
+      <h2 class="login-title">Join ExpenseTracker</h2>
+      <form id="signupForm">
+        <div class="form-group">
+          <label class="form-label">Full Name</label>
+          <input type="text" class="form-input" id="signupName" placeholder="Enter your full name" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Email</label>
+          <input type="email" class="form-input" id="signupEmail" placeholder="Enter your email" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Password</label>
+          <input type="password" class="form-input" id="signupPassword" placeholder="Create a password" required
+            minlength="6">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Confirm Password</label>
+          <input type="password" class="form-input" id="confirmPassword" placeholder="Confirm your password" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Monthly Budget</label>
+          <input type="number" class="form-input" id="signupBudget" placeholder="500" step="0.01" required>
+        </div>
+        <button type="submit" class="form-button">Sign Up</button>
+        <!-- This can go inside your form next to the submit button -->
+        <div id="signupLoader" class="loader" style="display: none;"></div>
+
+      </form>
+      <p class="auth-switch">
+        Already have an account?
+        <button class="auth-link" onclick="showLogin()">Login</button>
+      </p>
+      <button class="back-to-landing" onclick="showLanding()">Back to Landing</button>
+    </div>
+  </div>
+
+  <!-- Main Application -->
+  <div id="appContainer" class="app-container">
+    <header class="app-header">
+      <div class="logo">💰 FinTrack</div>
+      <nav class="app-nav">
+        <button class="nav-button active" onclick="showDashboard()">Dashboard</button>
+       
+      </nav>
+      <div class="user-info">
+        <span id="userWelcome">Welcome, User!</span>
+        <button class="logout-btn" onclick="logout()">Logout</button>
+      </div>
+    </header>
+
+    <div class="app-content">
+      <div class="dashboard">
+        <div class="summary-card">
+          <h3 class="summary-title">Monthly Budget</h3>
+          <div class="summary-amount"><span id="monthlyBudget">500</span></div>
+        </div>
+        <div class="summary-card">
+          <h3 class="summary-title">Total Spent</h3>
+          <div class="summary-amount spent"><span id="totalSpent">0</span></div>
+        </div>
+        <div class="summary-card">
+          <h3 class="summary-title">Remaining Budget</h3>
+          <div class="summary-amount"><span id="remainingBudget">500</span></div>
+        </div>
+        <div class="summary-card">
+          <h3 class="summary-title">This Month's Expenses</h3>
+          <div class="summary-amount"><span id="monthlyExpenses">0</span></div>
+        </div>
+      </div>
+
+      <div class="expense-form">
+        <h3 class="form-label">Add New Expense</h3>
+        <form id="expenseForm">
+          <div class="form-group">
+            <label class="form-label">Description</label>
+            <input type="text" class="form-input" id="expenseDescription" placeholder="e.g., Textbook for Math class"
+              required>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Amount</label>
+            <input type="number" class="form-input" id="expenseAmount" placeholder="0.00" step="0.01" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Category</label>
+            <select class="form-select" id="expenseCategory" required>
+              <option value="">Select category</option>
+              <option value="academic">📚 Academic</option>
+              <option value="food">🍕 Food & Dining</option>
+              <option value="entertainment">🎮 Entertainment</option>
+              <option value="transportation">🚗 Transportation</option>
+              <option value="personal">🛍️ Personal Care</option>
+              <option value="housing">🏠 Housing</option>
+              <option value="other">📦 Other</option>
+            </select>
+          </div>
+          <button type="submit" class="form-button">Add Expense</button>
+        </form>
+      </div>
+
+      <div class="expense-list">
+        <h3 class="form-label">Recent Expenses</h3>
+        <div class="expense-filters">
+          <select class="form-select" id="filterCategory" onchange="filterExpenses()">
+            <option value="">All Categories</option>
+            <option value="academic">📚 Academic</option>
+            <option value="food">🍕 Food & Dining</option>
+            <option value="entertainment">🎮 Entertainment</option>
+            <option value="transportation">🚗 Transportation</option>
+            <option value="personal">🛍️ Personal Care</option>
+            <option value="housing">🏠 Housing</option>
+            <option value="other">📦 Other</option>
+          </select>
+        </div>
+        <div id="expenseList"></div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Firebase configuration and initialization
+    const firebaseConfig = {
+      apiKey: "AIzaSyDQcXSEnqHbunstG2quOtqc-w2TvbFp2Sw",
+      authDomain: "fintrack-24f26.firebaseapp.com",
+      projectId: "fintrack-24f26",
+      storageBucket: "fintrack-24f26.appspot.com",
+      messagingSenderId: "503739765978",
+      appId: "1:503739765978:web:5233f1e323a70b180a01e3"
+    };
+
+    // Initialize Firebase
+    firebase.initializeApp(firebaseConfig);
+    const auth = firebase.auth();
+    const db = firebase.firestore();
+  </script>
+
+  <script src="script.js"></script>
+</body>
+
+</html>
