@@ -2,6 +2,8 @@
 let currentUser = null;
 let expenses = [];
 let monthlyBudget = 50000; // Default budget in Naira (₦50,000)
+let isEditingExpense = false;
+let currentEditExpenseId = null;
 
 // Initialize application
 document.addEventListener('DOMContentLoaded', () => {
@@ -53,6 +55,19 @@ async function saveUserToFirestore(userData) {
     }
 }
 
+async function updateUserBudgetInFirestore(newBudget) {
+    if (!currentUser) return;
+    try {
+        await db.collection('users').doc(currentUser.uid).update({
+            budget: newBudget
+        });
+        currentUser.budget = newBudget;
+    } catch (error) {
+        console.error('Error updating budget:', error);
+        throw error;
+    }
+}
+
 async function loadUserFromFirestore(uid) {
     try {
         const userDoc = await db.collection('users').doc(uid).get();
@@ -78,11 +93,27 @@ async function saveExpensesToFirestore() {
     }
 }
 
+async function updateExpenseInFirestore(expense) {
+    if (!currentUser) return;
+    try {
+        await db.collection(`users/${currentUser.uid}/expenses`).doc(expense.id.toString()).update(expense);
+    } catch (error) {
+        console.error('Error updating expense:', error);
+        throw error;
+    }
+}
+
 async function loadExpensesFromFirestore() {
     if (!currentUser) return;
     try {
         const snapshot = await db.collection(`users/${currentUser.uid}/expenses`).get();
-        expenses = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        expenses = snapshot.docs.map(doc => {
+            const data = doc.data();
+            return {
+                ...data,
+                id: data.id // Use the ID from the document data, not the document ID
+            };
+        });
     } catch (error) {
         console.error('Error loading expenses:', error);
         expenses = [];
@@ -298,29 +329,123 @@ document.getElementById('expenseForm').addEventListener('submit', async (e) => {
     if (!amount || amount <= 0) return showError('expenseAmount', 'Please enter a valid amount in Naira');
     if (!category) return showError('expenseCategory', 'Please select a category');
     
-    const expense = {
-        id: Date.now(),
-        description,
-        amount,
-        category,
-        date: new Date().toISOString(),
-        dateFormatted: new Date().toLocaleDateString('en-NG')
-    };
-    
-    expenses.push(expense);
-    await saveExpensesToFirestore();
-    updateSummary();
-    renderExpenses();
-    document.getElementById('expenseForm').reset();
-    showSuccess('expenseForm', 'Expense added successfully!');
-});
-
-async function deleteExpense(id) {
-    if (confirm('Are you sure you want to delete this expense?')) {
-        expenses = expenses.filter(expense => expense.id !== id);
-        await deleteExpenseFromFirestore(id);
+    try {
+        if (isEditingExpense) {
+            // Update existing expense
+            const expenseId = document.getElementById('expenseId').value;
+            const expenseIndex = expenses.findIndex(exp => exp.id.toString() === expenseId);
+            
+            if (expenseIndex !== -1) {
+                const updatedExpense = {
+                    ...expenses[expenseIndex],
+                    description,
+                    amount,
+                    category,
+                    date: new Date().toISOString(),
+                    dateFormatted: new Date().toLocaleDateString('en-NG')
+                };
+                
+                expenses[expenseIndex] = updatedExpense;
+                await updateExpenseInFirestore(updatedExpense);
+                
+                showSuccess('expenseForm', 'Expense updated successfully!');
+            }
+        } else {
+            // Add new expense
+            const expense = {
+                id: Date.now(),
+                description,
+                amount,
+                category,
+                date: new Date().toISOString(),
+                dateFormatted: new Date().toLocaleDateString('en-NG')
+            };
+            
+            expenses.push(expense);
+            await saveExpensesToFirestore();
+            showSuccess('expenseForm', 'Expense added successfully!');
+        }
+        
+        // Reset form and UI
+        document.getElementById('expenseForm').reset();
         updateSummary();
         renderExpenses();
+        cancelEdit();
+    } catch (error) {
+        console.error('Error saving expense:', error);
+        showError('expenseForm', 'Failed to save expense. Please try again.');
+    }
+});
+
+// Edit Expense Function
+function editExpense(id) {
+    const expense = expenses.find(exp => exp.id.toString() === id.toString());
+    if (!expense) return;
+    
+    isEditingExpense = true;
+    currentEditExpenseId = id;
+    
+    // Fill form with expense data
+    document.getElementById('expenseId').value = expense.id;
+    document.getElementById('expenseDescription').value = expense.description;
+    document.getElementById('expenseAmount').value = expense.amount;
+    document.getElementById('expenseCategory').value = expense.category;
+    
+    // Update UI for editing mode
+    document.getElementById('expenseSubmitBtn').textContent = 'Update Expense';
+    document.getElementById('expenseCancelBtn').style.display = 'inline-block';
+    document.querySelector('.form-label').textContent = 'Edit Expense';
+    
+    // Scroll to form
+    document.getElementById('expenseForm').scrollIntoView({ behavior: 'smooth' });
+}
+
+// Cancel Edit Function
+function cancelEdit() {
+    isEditingExpense = false;
+    currentEditExpenseId = null;
+    
+    // Reset form
+    document.getElementById('expenseForm').reset();
+    document.getElementById('expenseId').value = '';
+    
+    // Update UI back to add mode
+    document.getElementById('expenseSubmitBtn').textContent = 'Add Expense';
+    document.getElementById('expenseCancelBtn').style.display = 'none';
+    document.querySelector('.form-label').textContent = 'Add New Expense';
+}
+
+// Delete Expense Function
+async function deleteExpense(id) {
+    if (confirm('Are you sure you want to delete this expense?')) {
+        try {
+            // Convert id to number for consistent comparison
+            const expenseId = typeof id === 'string' ? parseInt(id) : id;
+            
+            // Remove from local array
+            expenses = expenses.filter(expense => {
+                const currentExpenseId = typeof expense.id === 'string' ? parseInt(expense.id) : expense.id;
+                return currentExpenseId !== expenseId;
+            });
+            
+            // Delete from Firestore
+            await deleteExpenseFromFirestore(expenseId);
+            
+            // Update UI
+            updateSummary();
+            renderExpenses();
+            
+            // Show success message
+            showSuccess('expenseForm', 'Expense deleted successfully!');
+            
+        } catch (error) {
+            console.error('Error deleting expense:', error);
+            showError('expenseForm', 'Failed to delete expense. Please try again.');
+            // Reload expenses from Firestore to ensure consistency
+            await loadExpensesFromFirestore();
+            updateSummary();
+            renderExpenses();
+        }
     }
 }
 
@@ -361,10 +486,11 @@ function renderExpenses() {
                     <div class="expense-title">${expense.description}</div>
                     <div class="expense-date">${expense.dateFormatted}</div>
                 </div>
-                <div style="display: flex; align-items: center; gap: 1rem;">
+                <div class="expense-actions">
                     <span class="expense-category">${getCategoryIcon(expense.category)} ${formatCategoryName(expense.category)}</span>
                     <span class="expense-amount">${formatNaira(expense.amount)}</span>
-                    <button class="delete-btn" onclick="deleteExpense(${expense.id})">Delete</button>
+                    <button class="edit-expense-btn" onclick="editExpense('${expense.id}')">Edit</button>
+                    <button class="delete-btn" onclick="deleteExpense('${expense.id}')">Delete</button>
                 </div>
             </div>
         `).join('');
@@ -400,8 +526,452 @@ function formatCategoryName(category) {
     return names[category] || 'Other';
 }
 
+// Budget Edit Functions
+function showEditBudgetModal() {
+    const modal = document.getElementById('editBudgetModal');
+    const currentBudgetInput = document.getElementById('editBudgetAmount');
+    
+    if (modal && currentBudgetInput) {
+        currentBudgetInput.value = monthlyBudget;
+        modal.style.display = 'flex';
+    }
+}
+
+function hideEditBudgetModal() {
+    const modal = document.getElementById('editBudgetModal');
+    if (modal) {
+        modal.style.display = 'none';
+    }
+    // Clear any error messages
+    document.querySelectorAll('.error-message').forEach(el => el.remove());
+}
+
+async function updateBudget() {
+    const newBudgetInput = document.getElementById('editBudgetAmount');
+    const newBudget = parseFloat(newBudgetInput.value);
+    
+    // Clear previous errors
+    document.querySelectorAll('.error-message').forEach(el => el.remove());
+    
+    if (!newBudget || newBudget <= 0) {
+        showError('editBudgetAmount', 'Please enter a valid budget amount (minimum ₦1,000)');
+        return;
+    }
+    
+    if (newBudget < 1000) {
+        showError('editBudgetAmount', 'Budget must be at least ₦1,000');
+        return;
+    }
+    
+    try {
+        // Show loading state
+        const updateButton = document.querySelector('#editBudgetModal .update-btn');
+        const originalText = updateButton.textContent;
+        updateButton.textContent = 'Updating...';
+        updateButton.disabled = true;
+        
+        // Update in Firestore
+        await updateUserBudgetInFirestore(newBudget);
+        
+        // Update local state
+        monthlyBudget = newBudget;
+        
+        // Update UI
+        document.getElementById('monthlyBudget').textContent = formatNaira(monthlyBudget);
+        updateSummary();
+        
+        // Show success message
+        showSuccess('editBudgetForm', 'Budget updated successfully!');
+        
+        // Hide modal after a short delay
+        setTimeout(() => {
+            hideEditBudgetModal();
+        }, 1500);
+        
+    } catch (error) {
+        console.error('Error updating budget:', error);
+        showError('editBudgetAmount', 'Failed to update budget. Please try again.');
+    } finally {
+        // Reset button state
+        const updateButton = document.querySelector('#editBudgetModal .update-btn');
+        updateButton.textContent = 'Update Budget';
+        updateButton.disabled = false;
+    }
+}
+
+// Handle escape key to close modal
+document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+        hideEditBudgetModal();
+    }
+});
+
 // Navigation Functions
 function showDashboard() {
     document.querySelectorAll('.nav-button').forEach(btn => btn.classList.remove('active'));
     if (event && event.target) event.target.classList.add('active');
 }
+
+// Make functions globally available for onclick handlers
+window.deleteExpense = deleteExpense;
+window.editExpense = editExpense;
+window.cancelEdit = cancelEdit;
+window.showEditBudgetModal = showEditBudgetModal;
+window.hideEditBudgetModal = hideEditBudgetModal;
+window.updateBudget = updateBudget;
+
+// [Previous JavaScript remains the same until the end of the file]
+
+// Analytics Functions
+let budgetChart, categoryChart, monthlyTrendChart;
+
+function showAnalytics() {
+    document.getElementById('dashboardView').style.display = 'none';
+    document.getElementById('analyticsView').style.display = 'block';
+    document.querySelectorAll('.nav-button').forEach(btn => btn.classList.remove('active'));
+    event.target.classList.add('active');
+    updateAnalytics();
+}
+
+function updateAnalytics() {
+    const timePeriod = document.getElementById('timePeriod').value;
+    renderBudgetChart(timePeriod);
+    renderCategoryChart(timePeriod);
+    renderMonthlyTrendChart(timePeriod);
+    renderTopExpenses(timePeriod);
+    renderCategoryDistribution(timePeriod);
+}
+
+function renderBudgetChart(timePeriod) {
+    const ctx = document.getElementById('budgetChart').getContext('2d');
+    const filteredExpenses = filterExpensesByTimePeriod(timePeriod);
+    const totalExpenses = filteredExpenses.reduce((sum, expense) => sum + expense.amount, 0);
+    
+    if (budgetChart) {
+        budgetChart.destroy();
+    }
+    
+    budgetChart = new Chart(ctx, {
+        type: 'doughnut',
+        data: {
+            labels: ['Remaining Budget', 'Expenses'],
+            datasets: [{
+                data: [Math.max(0, monthlyBudget - totalExpenses), totalExpenses],
+                backgroundColor: [
+                    '#4caf50',
+                    '#ff6b6b'
+                ],
+                borderColor: [
+                    'rgba(255, 255, 255, 0.2)',
+                    'rgba(255, 255, 255, 0.2)'
+                ],
+                borderWidth: 1
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    position: 'bottom',
+                    labels: {
+                        color: 'white'
+                    }
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            let label = context.label || '';
+                            if (label) {
+                                label += ': ';
+                            }
+                            label += formatNaira(context.raw);
+                            return label;
+                        }
+                    }
+                }
+            }
+        }
+    });
+}
+
+function renderCategoryChart(timePeriod) {
+    const ctx = document.getElementById('categoryChart').getContext('2d');
+    const filteredExpenses = filterExpensesByTimePeriod(timePeriod);
+    
+    const categories = {
+        'academic': 0,
+        'food': 0,
+        'entertainment': 0,
+        'transportation': 0,
+        'personal': 0,
+        'housing': 0,
+        'other': 0
+    };
+    
+    filteredExpenses.forEach(expense => {
+        categories[expense.category] += expense.amount;
+    });
+    
+    const labels = Object.keys(categories).map(cat => formatCategoryName(cat));
+    const data = Object.values(categories);
+    const backgroundColors = [
+        'rgba(75, 192, 192, 0.7)',
+        'rgba(54, 162, 235, 0.7)',
+        'rgba(255, 99, 132, 0.7)',
+        'rgba(255, 159, 64, 0.7)',
+        'rgba(153, 102, 255, 0.7)',
+        'rgba(255, 206, 86, 0.7)',
+        'rgba(201, 203, 207, 0.7)'
+    ];
+    
+    if (categoryChart) {
+        categoryChart.destroy();
+    }
+    
+    categoryChart = new Chart(ctx, {
+        type: 'pie',
+        data: {
+            labels: labels,
+            datasets: [{
+                data: data,
+                backgroundColor: backgroundColors,
+                borderColor: 'rgba(255, 255, 255, 0.2)',
+                borderWidth: 1
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    position: 'bottom',
+                    labels: {
+                        color: 'white'
+                    }
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            let label = context.label || '';
+                            if (label) {
+                                label += ': ';
+                            }
+                            label += formatNaira(context.raw);
+                            const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                            const percentage = Math.round((context.raw / total) * 100);
+                            label += ` (${percentage}%)`;
+                            return label;
+                        }
+                    }
+                }
+            }
+        }
+    });
+}
+
+function renderMonthlyTrendChart(timePeriod) {
+    const ctx = document.getElementById('monthlyTrendChart').getContext('2d');
+    const currentDate = new Date();
+    const months = [];
+    const monthlyData = [];
+    
+    // Determine how many months to show
+    let monthCount = 6; // Default to 6 months
+    if (timePeriod === 'year') monthCount = 12;
+    if (timePeriod === 'all') {
+        if (expenses.length > 0) {
+            const firstExpenseDate = new Date(expenses[expenses.length - 1].date);
+            monthCount = (currentDate.getFullYear() - firstExpenseDate.getFullYear()) * 12 + 
+                         (currentDate.getMonth() - firstExpenseDate.getMonth()) + 1;
+            monthCount = Math.max(6, monthCount); // Show at least 6 months
+            monthCount = Math.min(24, monthCount); // Cap at 24 months
+        }
+    }
+    
+    // Prepare data for each month
+    for (let i = monthCount - 1; i >= 0; i--) {
+        const date = new Date();
+        date.setMonth(date.getMonth() - i);
+        
+        const monthName = date.toLocaleString('default', { month: 'short' });
+        const year = date.getFullYear();
+        months.push(`${monthName} ${year}`);
+        
+        const monthExpenses = expenses.filter(expense => {
+            const expenseDate = new Date(expense.date);
+            return expenseDate.getMonth() === date.getMonth() && 
+                   expenseDate.getFullYear() === date.getFullYear();
+        });
+        
+        const total = monthExpenses.reduce((sum, expense) => sum + expense.amount, 0);
+        monthlyData.push(total);
+    }
+    
+    if (monthlyTrendChart) {
+        monthlyTrendChart.destroy();
+    }
+    
+    monthlyTrendChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: months,
+            datasets: [{
+                label: 'Monthly Expenses',
+                data: monthlyData,
+                backgroundColor: 'rgba(102, 126, 234, 0.2)',
+                borderColor: 'rgba(102, 126, 234, 1)',
+                borderWidth: 2,
+                tension: 0.3,
+                fill: true
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    labels: {
+                        color: 'white'
+                    }
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            return `Expenses: ${formatNaira(context.raw)}`;
+                        }
+                    }
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    ticks: {
+                        color: 'rgba(255, 255, 255, 0.7)',
+                        callback: function(value) {
+                            return formatNaira(value);
+                        }
+                    },
+                    grid: {
+                        color: 'rgba(255, 255, 255, 0.1)'
+                    }
+                },
+                x: {
+                    ticks: {
+                        color: 'rgba(255, 255, 255, 0.7)'
+                    },
+                    grid: {
+                        color: 'rgba(255, 255, 255, 0.1)'
+                    }
+                }
+            }
+        }
+    });
+}
+
+function renderTopExpenses(timePeriod) {
+    const filteredExpenses = filterExpensesByTimePeriod(timePeriod);
+    const sortedExpenses = [...filteredExpenses].sort((a, b) => b.amount - a.amount).slice(0, 5);
+    const container = document.getElementById('topExpensesList');
+    
+    if (sortedExpenses.length === 0) {
+        container.innerHTML = '<p style="color: white; text-align: center;">No expenses found</p>';
+        return;
+    }
+    
+    container.innerHTML = sortedExpenses.map(expense => `
+        <div class="top-expense-item">
+            <div>
+                <div class="expense-title">${expense.description}</div>
+                <div class="expense-date">${expense.dateFormatted}</div>
+            </div>
+            <div class="expense-amount">${formatNaira(expense.amount)}</div>
+        </div>
+    `).join('');
+}
+
+function renderCategoryDistribution(timePeriod) {
+    const filteredExpenses = filterExpensesByTimePeriod(timePeriod);
+    const categories = {
+        'academic': 0,
+        'food': 0,
+        'entertainment': 0,
+        'transportation': 0,
+        'personal': 0,
+        'housing': 0,
+        'other': 0
+    };
+    
+    filteredExpenses.forEach(expense => {
+        categories[expense.category] += expense.amount;
+    });
+    
+    const total = filteredExpenses.reduce((sum, expense) => sum + expense.amount, 0);
+    const container = document.getElementById('categoryDistribution');
+    
+    if (total === 0) {
+        container.innerHTML = '<p style="color: white; text-align: center;">No expenses found</p>';
+        return;
+    }
+    
+    container.innerHTML = Object.entries(categories)
+        .filter(([_, amount]) => amount > 0)
+        .sort((a, b) => b[1] - a[1])
+        .map(([category, amount]) => {
+            const percentage = Math.round((amount / total) * 100);
+            return `
+                <div class="category-dist-item">
+                    <div class="category-dist-name">
+                        ${getCategoryIcon(category)} ${formatCategoryName(category)}
+                    </div>
+                    <div class="category-dist-bar">
+                        <div class="category-dist-progress" style="width: ${percentage}%"></div>
+                    </div>
+                    <div class="category-dist-amount">${percentage}%</div>
+                </div>
+            `;
+        }).join('');
+}
+
+function filterExpensesByTimePeriod(timePeriod) {
+    const currentDate = new Date();
+    const currentMonth = currentDate.getMonth();
+    const currentYear = currentDate.getFullYear();
+    
+    switch (timePeriod) {
+        case 'month':
+            return expenses.filter(expense => {
+                const expenseDate = new Date(expense.date);
+                return expenseDate.getMonth() === currentMonth && 
+                       expenseDate.getFullYear() === currentYear;
+            });
+        case 'year':
+            return expenses.filter(expense => {
+                const expenseDate = new Date(expense.date);
+                return expenseDate.getFullYear() === currentYear;
+            });
+        case 'all':
+            return [...expenses];
+        default:
+            return [];
+    }
+}
+
+
+function showDashboard() {
+    document.getElementById('dashboardView').style.display = 'block';
+    document.getElementById('analyticsView').style.display = 'none';
+    document.querySelectorAll('.nav-button').forEach(btn => btn.classList.remove('active'));
+    event.target.classList.add('active');
+}
+
+function showAnalytics() {
+    document.getElementById('dashboardView').style.display = 'none';
+    document.getElementById('analyticsView').style.display = 'block';
+    document.querySelectorAll('.nav-button').forEach(btn => btn.classList.remove('active'));
+    event.target.classList.add('active');
+    updateAnalytics();
+}
+
+// [Rest of the JavaScript code remains the same]
+// [Rest of the previous JavaScript remains the same]
