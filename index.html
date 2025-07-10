@@ -2,6 +2,7 @@
 <html lang="en">
 
 <head>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Student Expense Tracker</title>
@@ -18,9 +19,8 @@
     <nav class="landing-nav">
       <div class="logo">💰 FinTrack</div>
       <div class="nav-links">
-        <a href="#features">Features</a>
-        <a href="#about">About</a>
-        <a href="#contact">Contact</a>
+        <a href="features.html">Features</a>
+        <a href="contact.html">Contact</a>
       </div>
     </nav>
 
@@ -107,9 +107,7 @@
           <input type="number" class="form-input" id="signupBudget" placeholder="500" step="0.01" required>
         </div>
         <button type="submit" class="form-button">Sign Up</button>
-        <!-- This can go inside your form next to the submit button -->
         <div id="signupLoader" class="loader" style="display: none;"></div>
-
       </form>
       <p class="auth-switch">
         Already have an account?
@@ -125,7 +123,7 @@
       <div class="logo">💰 FinTrack</div>
       <nav class="app-nav">
         <button class="nav-button active" onclick="showDashboard()">Dashboard</button>
-       
+        <button class="nav-button" onclick="showAnalytics()">Analytics</button>
       </nav>
       <div class="user-info">
         <span id="userWelcome">Welcome, User!</span>
@@ -133,11 +131,13 @@
       </div>
     </header>
 
-    <div class="app-content">
+    <!-- Dashboard View -->
+    <div id="dashboardView" class="app-content">
       <div class="dashboard">
         <div class="summary-card">
           <h3 class="summary-title">Monthly Budget</h3>
           <div class="summary-amount"><span id="monthlyBudget">500</span></div>
+          <button class="edit-btn" onclick="showEditBudgetModal()">Edit</button>
         </div>
         <div class="summary-card">
           <h3 class="summary-title">Total Spent</h3>
@@ -156,6 +156,7 @@
       <div class="expense-form">
         <h3 class="form-label">Add New Expense</h3>
         <form id="expenseForm">
+          <input type="hidden" id="expenseId">
           <div class="form-group">
             <label class="form-label">Description</label>
             <input type="text" class="form-input" id="expenseDescription" placeholder="e.g., Textbook for Math class"
@@ -178,7 +179,9 @@
               <option value="other">📦 Other</option>
             </select>
           </div>
-          <button type="submit" class="form-button">Add Expense</button>
+          <button type="submit" class="form-button" id="expenseSubmitBtn">Add Expense</button>
+          <button type="button" class="form-button cancel-btn" id="expenseCancelBtn" style="display: none;"
+            onclick="cancelEdit()">Cancel</button>
         </form>
       </div>
 
@@ -198,6 +201,71 @@
         </div>
         <div id="expenseList"></div>
       </div>
+    </div>
+
+    <!-- Analytics View -->
+    <div id="analyticsView" class="app-content" style="display: none;">
+      <div class="analytics-header">
+        <h2>Expense Analytics</h2>
+        <div class="time-period-selector">
+          <select id="timePeriod" onchange="updateAnalytics()">
+            <option value="month">This Month</option>
+            <option value="year">This Year</option>
+            <option value="all">All Time</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="analytics-grid">
+        <div class="analytics-card">
+          <h3>Spending Overview</h3>
+          <div class="chart-container">
+            <canvas id="budgetChart"></canvas>
+          </div>
+        </div>
+
+        <div class="analytics-card">
+          <h3>Expense Breakdown</h3>
+          <div class="chart-container">
+            <canvas id="categoryChart"></canvas>
+          </div>
+        </div>
+
+        <div class="analytics-card full-width">
+          <h3>Monthly Trends</h3>
+          <div class="chart-container">
+            <canvas id="monthlyTrendChart"></canvas>
+          </div>
+        </div>
+
+        <div class="analytics-card">
+          <h3>Top Expenses</h3>
+          <div id="topExpensesList"></div>
+        </div>
+
+        <div class="analytics-card">
+          <h3>Category Distribution</h3>
+          <div id="categoryDistribution"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Edit Budget Modal -->
+  <div id="editBudgetModal" class="modal">
+    <div class="modal-content">
+      <h3>Edit Monthly Budget</h3>
+      <form id="editBudgetForm">
+        <div class="form-group">
+          <label class="form-label">New Budget Amount</label>
+          <input type="number" class="form-input" id="editBudgetAmount" placeholder="Enter new budget" step="0.01"
+            required>
+        </div>
+        <div class="modal-buttons">
+          <button type="button" class="form-button cancel-btn" onclick="hideEditBudgetModal()">Cancel</button>
+          <button type="button" class="form-button update-btn" onclick="updateBudget()">Update Budget</button>
+        </div>
+      </form>
     </div>
   </div>
 
